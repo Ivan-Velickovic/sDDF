@@ -70,17 +70,17 @@ int get_client(uintptr_t dma_vaddr) {
         } else if (compare_mac(dest_addr, broadcast) == 0) {
             // broadcast packet, send the packet to the first client to handle.
             // This is temporary, eventually we will have a different
-            // component to deal with this. 
+            // component to deal with this.
             return 0;
         }
     }
     return -1;
 }
 
-/* 
+/*
 Loop over driver and insert all used rx buffers to appropriate client queues.
 */
-void process_rx_complete(void) 
+void process_rx_complete(void)
 {
     int notify_clients[NUM_CLIENTS];
     while(!ring_empty(state.rx_ring_drv.used_ring)) {
