@@ -109,7 +109,7 @@ void process_rx_complete(void)
                 notify_clients[client] = 1;
             }
         } else {
-            // no match, not for us, return the buffer to the driver. 
+            // no match, not for us, return the buffer to the driver.
             enqueue_avail(&state.rx_ring_drv, addr, len, cookie);
             dropped++;
         }
@@ -131,7 +131,7 @@ void process_rx_free(void)
             uintptr_t addr;
             unsigned int len;
             void *buffer;
-            dequeue_avail(&state.rx_ring_clients[i], &addr, &len, &buffer);   
+            dequeue_avail(&state.rx_ring_clients[i], &addr, &len, &buffer);
             enqueue_avail(&state.rx_ring_drv, addr, len, buffer);
         }
     }
@@ -145,7 +145,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
         puthex64(ch);
         return sel4cp_msginfo_new(0, 0);
     }
-    // return the MAC address. 
+    // return the MAC address.
     uint32_t lower = (state.mac_addrs[ch][0] << 24) |
                      (state.mac_addrs[ch][1] << 16) |
                      (state.mac_addrs[ch][2] << 8) |
@@ -189,9 +189,9 @@ void init(void)
     /* Set up shared memory regions */
     ring_init(&state.rx_ring_drv, (ring_buffer_t *)rx_avail_drv, (ring_buffer_t *)rx_used_drv, NULL, 1);
 
-    // FIX ME: Use the notify function pointer to put the notification in? 
+    // FIX ME: Use the notify function pointer to put the notification in?
     ring_init(&state.rx_ring_clients[0], (ring_buffer_t *)rx_avail_cli, (ring_buffer_t *)rx_used_cli, NULL, 0);
-    
+
     return;
 }
 
