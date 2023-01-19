@@ -247,7 +247,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     return ret;
 }
 
-void process_rx_queue(void) 
+void process_rx_queue(void)
 {
     sel4cp_dbg_puts("lwip: process_rx_queue\n");
     while(!ring_empty(state.rx_ring.used_ring)) {
