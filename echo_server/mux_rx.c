@@ -215,7 +215,7 @@ bool process_rx_free(void)
         // puthex64(num_invoked);
         // print("\n");
         // sel4cp_notify(DRIVER_CH);
-        sel4cp_notify_delayed(DRIVER_CH);
+//        sel4cp_notify_delayed(DRIVER_CH);
     }
 
     return enqueued;
@@ -290,8 +290,8 @@ void notified(sel4cp_channel ch)
         //     puthex64(ring_size(state.rx_ring_drv.used_ring));
         //     print("\n\n");
         // }
-        process_rx_complete();
         process_rx_free();
+        process_rx_complete();
         // if (!complete_done_work && !free_done_work) {
             // print("MUX RX| no work done ");
             // if (ch == COPY_CH) {

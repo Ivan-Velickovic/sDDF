@@ -83,7 +83,7 @@ void process_tx_complete(void)
         if (has_received_pp) {
             has_notified_client_since_pp = true;
         }
-        sel4cp_notify(CLIENT_CH);
+        //sel4cp_notify(CLIENT_CH);
     }
 }
 

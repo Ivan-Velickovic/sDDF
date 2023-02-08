@@ -330,7 +330,7 @@ raw_tx(volatile struct enet_regs *eth, unsigned int num, uintptr_t *phys,
     /* Ensure we have room */
     if (ring->remain < num) {
         /* not enough room, try to complete some and check again */
-        complete_tx(eth);
+        // complete_tx(eth);
         unsigned int rem = ring->remain;
         if (rem < num) {
             print("TX queue lacks space");
@@ -445,11 +445,6 @@ complete_tx(volatile struct enet_regs *eth)
         }
     }
 
-    // @ivanv: commment why we do this.
-    if (!ring_empty(tx_ring.used_ring)) {
-        handle_tx(eth);
-    }
-
     if (was_empty && enqueued) {
         if (has_received_pp) {
             has_notified_mux_tx_since_pp = true;
@@ -477,6 +472,9 @@ handle_eth(volatile struct enet_regs *eth)
         if (e & NETIRQ_TXF) {
             num_tx_irqs += 1;
             complete_tx(eth);
+            if (!ring_empty(tx_ring.used_ring)) {
+                handle_tx(eth);
+            }
         }
         if (e & NETIRQ_RXF) {
             num_rx_irqs += 1;
@@ -552,8 +550,9 @@ eth_setup(void)
 
     eth->opd = PAUSE_OPCODE_FIELD;
 
-    /* coalesce transmit IRQs to batches of 128 */
-    eth->txic0 = TX_ICEN | ICFT(128) | 0xFF;
+    /* coalesce IRQs to batches of 128 */
+    eth->rxic0 = ICEN | ICFT(128) | 0xff;
+    eth->txic0 = ICEN | ICFT(128) | 0xFF;
     eth->tipg = TIPG;
     /* Transmit FIFO Watermark register - store and forward */
     eth->tfwr = 0;

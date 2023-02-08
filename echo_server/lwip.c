@@ -576,7 +576,7 @@ void notified(sel4cp_channel ch)
     }
     if (notify_rx) {
         notify_rx = false;
-        sel4cp_notify(RX_CH);
+        //sel4cp_notify(RX_CH);
     }
     if (notify_tx) {
         notify_tx = false;
