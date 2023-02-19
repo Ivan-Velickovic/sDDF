@@ -41,9 +41,9 @@ BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
 # IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf serial.elf
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
-LDFLAGS := -L$(BOARD_DIR)/lib -L.
-LIBS := -lsel4cp -Tsel4cp.ld -lc
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT -DLWIP_NO_CTYPE_H
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := -lsel4cp -Tsel4cp.ld
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
@@ -92,12 +92,12 @@ NETIFFILES=$(LWIPDIR)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o libsharedringbuffer/shared_ringbuffer.o utilization_socket.o udp_echo_socket.o timer.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o libsharedringbuffer/shared_ringbuffer.o utilization_socket.o udp_echo_socket.o timer.o libc.o
 
 ETH_OBJS := eth.o libsharedringbuffer/shared_ringbuffer.o
 MUX_RX_OBJS := mux_rx.o libsharedringbuffer/shared_ringbuffer.o
 MUX_TX_OBJS := mux_tx.o libsharedringbuffer/shared_ringbuffer.o
-COPY_OBJS := copy.o libsharedringbuffer/shared_ringbuffer.o
+COPY_OBJS := copy.o libsharedringbuffer/shared_ringbuffer.o libc.o
 BENCH_OBJS := benchmark/benchmark.o
 IDLE_OBJS := benchmark/idle.o
 SERIAL_OBJS := serial.o
