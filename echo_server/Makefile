@@ -39,10 +39,39 @@ RINGBUFFERDIR=libsharedringbuffer
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf
+IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf copy_rs.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
 LDFLAGS := -L$(BOARD_DIR)/lib -L.
 LIBS := -lsel4cp -Tsel4cp.ld -lc
+
+########################
+# Rust compilation stuff
+
+RUST_TARGET_PATH := rust_target
+RUST_SEL4CP_TARGET := aarch64-sel4cp-minimal
+TARGET_DIR := $(BUILD_DIR)/target
+
+SEL4CP_SDK_CONFIG := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/config.json
+SEL4CP_SDK_INCLUDE_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/include
+
+RUST_ENV := \
+	RUST_TARGET_PATH=$(abspath $(RUST_TARGET_PATH)) \
+	SEL4_CONFIG=$(abspath $(SEL4CP_SDK_CONFIG)) \
+	SEL4_INCLUDE_DIRS=$(abspath $(SEL4CP_SDK_INCLUDE_DIR))
+
+RUST_OPTIONS := \
+	--locked \
+	-Z unstable-options \
+	-Z bindeps \
+	-Z build-std=core,alloc,compiler_builtins \
+	-Z build-std-features=compiler-builtins-mem \
+	--target $(RUST_SEL4CP_TARGET) \
+	--release \
+	--target-dir $(abspath $(TARGET_DIR)) \
+	--out-dir $(BUILD_DIR)
+
+# Rust compilation stuff ends
+########################
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
@@ -132,6 +161,10 @@ $(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
 $(BUILD_DIR)/copy.elf: $(addprefix $(BUILD_DIR)/, $(COPY_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+$(BUILD_DIR)/copy_rs.elf: copy_rs.rs shared_ringbuffer.rs
+	$(RUST_ENV) \
+		cargo build $(RUST_OPTIONS)
+
 $(BUILD_DIR)/benchmark.elf: $(addprefix $(BUILD_DIR)/, $(BENCH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
@@ -139,7 +172,12 @@ $(BUILD_DIR)/idle.elf: $(addprefix $(BUILD_DIR)/, $(IDLE_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) eth.system
-	$(SEL4CP_TOOL) eth.system --search-path $(BUILD_DIR) --board $(SEL4CP_BOARD) --config $(SEL4CP_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	$(SEL4CP_TOOL) eth.system \
+		--search-path $(BUILD_DIR) \
+		--board $(SEL4CP_BOARD) \
+		--config $(SEL4CP_CONFIG) \
+		-o $(IMAGE_FILE) \
+		-r $(REPORT_FILE)
 
 .PHONY: all compile clean
 

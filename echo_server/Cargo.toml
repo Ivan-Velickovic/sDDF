@@ -1,0 +1,16 @@
+[package]
+name = "sddf"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "copy_rs"
+path = "copy_rs.rs"
+
+[dependencies]
+
+[dependencies.sel4cp]
+path = "../../rust-seL4/crates/sel4cp"
+features = ["alloc"]
+
+
