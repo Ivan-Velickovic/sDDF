@@ -45,7 +45,9 @@ pub struct RingHandle {
  * @return true indicates the buffer is empty, false otherwise.
  */
 pub fn ring_empty(ring: *mut RingBuffer) -> bool {
-    return ring_size(ring) == 0;
+    unsafe {
+        return ring_size(ring) == 0;
+    }
 }
 
 /**
@@ -57,13 +59,17 @@ pub fn ring_empty(ring: *mut RingBuffer) -> bool {
  */
 pub fn ring_full(ring: *mut RingBuffer) -> bool
 {
-    return ring_size(ring) == RING_SIZE - 1;
+    unsafe {
+        return ring_size(ring) == RING_SIZE - 1;
+    }
 }
 
 pub fn ring_size(ring: *mut RingBuffer) -> u32
 {
-    assert!((*ring).write_idx - (*ring).read_idx >= 0);
-    return (*ring).write_idx - (*ring).read_idx;
+    unsafe {
+        assert!((*ring).write_idx - (*ring).read_idx >= 0);
+        return (*ring).write_idx - (*ring).read_idx;
+    }
 }
 
 /**
@@ -89,17 +95,19 @@ pub fn notify(ring: &RingHandle) {
 pub fn enqueue(ring: *mut RingBuffer, buffer: usize, len: u32, cookie: *mut c_void) -> Result<(), &'static str>
 {
     assert!(buffer != 0);
-    if ring_full(ring) {
-        return Err("Trying to enqueue onto a full ring");
+    unsafe {
+        if ring_full(ring) {
+            return Err("Trying to enqueue onto a full ring");
+        }
+
+        let idx = ((*ring).write_idx % RING_SIZE) as usize;
+        (*ring).buffers[idx].encoded_addr = buffer;
+        (*ring).buffers[idx].len = len;
+        (*ring).buffers[idx].cookie = cookie;
+
+        // THREAD_MEMORY_RELEASE();
+        (*ring).write_idx += 1;
     }
-
-    let idx = ((*ring).write_idx % RING_SIZE) as usize;
-    (*ring).buffers[idx].encoded_addr = buffer;
-    (*ring).buffers[idx].len = len;
-    (*ring).buffers[idx].cookie = cookie;
-
-    // THREAD_MEMORY_RELEASE();
-    (*ring).write_idx += 1;
 
     Ok(())
 }
@@ -116,20 +124,20 @@ pub fn enqueue(ring: *mut RingBuffer, buffer: usize, len: u32, cookie: *mut c_vo
  */
 pub fn dequeue(ring: *mut RingBuffer, addr: &mut usize, len: &mut u32, cookie: *mut *mut c_void) -> Result<(), &'static str>
 {
-    if ring_empty(ring) {
-        return Err("Trying to dequeue from an empty ring");
-    }
-
-    let idx = ((*ring).read_idx % RING_SIZE) as usize;
-    assert!((*ring).buffers[idx].encoded_addr != 0);
-    *addr = (*ring).buffers[idx].encoded_addr;
-    *len = (*ring).buffers[idx].len;
     unsafe {
-        *cookie = (*ring).buffers[idx].cookie;
-    }
+        if ring_empty(ring) {
+            return Err("Trying to dequeue from an empty ring");
+        }
 
-    // THREAD_MEMORY_RELEASE();
-    (*ring).read_idx += 1;
+        let idx = ((*ring).read_idx % RING_SIZE) as usize;
+        assert!((*ring).buffers[idx].encoded_addr != 0);
+        *addr = (*ring).buffers[idx].encoded_addr;
+        *len = (*ring).buffers[idx].len;
+        *cookie = (*ring).buffers[idx].cookie;
+
+        // THREAD_MEMORY_RELEASE();
+        (*ring).read_idx += 1;
+    }
 
     Ok(())
 }
@@ -209,9 +217,11 @@ pub fn ring_init(ring: &mut RingHandle, free: *mut RingBuffer, used: *mut RingBu
     ring.notify = notify;
 
     if buffer_init {
-        (*ring.free_ring).write_idx = 0;
-        (*ring.free_ring).read_idx = 0;
-        (*ring.used_ring).write_idx = 0;
-        (*ring.used_ring).read_idx = 0;
+        unsafe {
+            (*ring.free_ring).write_idx = 0;
+            (*ring.free_ring).read_idx = 0;
+            (*ring.used_ring).write_idx = 0;
+            (*ring.used_ring).read_idx = 0;
+        }
     }
 }
