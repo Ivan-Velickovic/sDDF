@@ -1,43 +1,21 @@
 #![no_std]
 #![no_main]
+#![feature(never_type)]
 
 extern crate alloc;
 
 mod shared_ringbuffer;
 
-use sel4cp::{debug_println, main, NullHandler};
-use shared_ringbuffer::{ring_init, RingHandle};
+use sel4cp::{debug_println, main, Handler, Channel};
+use shared_ringbuffer::{ring_init, RingBuffer};
+use sel4cp::memory_region::{
+    declare_memory_region, MemoryRegion, ReadWrite,
+};
 
-#[main(heap_size = 0x10000)]
-fn main() -> NullHandler {
-    debug_println!("Hello, World!");
+const REGION_SIZE: usize = 0x200_000;
 
-    /* Set up shared memory regions */
-    // ring_init(&rx_ring_mux, (ring_buffer_t *)rx_free_mux, (ring_buffer_t *)rx_used_mux, NULL, 1);
-    // ring_init(&rx_ring_cli, (ring_buffer_t *)rx_free_cli, (ring_buffer_t *)rx_used_cli, NULL, 0);
-
-    /* Enqueue free buffers for the mux to access */
-    for i in 0..NUM_BUFFERS {
-        let _ = shared_dma_vaddr_mux + (BUF_SIZE * i);
-        // let err = enqueue_free(&rx_ring_mux, addr, BUF_SIZE, NULL);
-        // assert(!err);
-    }
-
-    NullHandler::new()
-}
-
-static rx_free_mux: usize = 0;
-static rx_used_mux: usize = 0;
-
-static rx_free_cli: usize = 0;
-static rx_used_cli: usize = 0;
-
-static shared_dma_vaddr_mux: usize = 0;
-static shared_dma_vaddr_cli: usize = 0;
-static uart_base: usize = 0;
-
-const MUX_RX_CH: usize = 0;
-const CLIENT_CH: usize = 1;
+const MUX_RX: Channel = Channel::new(0);
+const CLIENT: Channel = Channel::new(1);
 
 const BUF_SIZE: usize = 2048;
 const NUM_BUFFERS: usize = 512;
@@ -45,8 +23,85 @@ const SHARED_DMA_SIZE: usize = BUF_SIZE * NUM_BUFFERS;
 
 static mut initialised: bool = false;
 
-// static rx_ring_mux: *mut RingHandle = {};
-// static rx_ring_cli: *mut RingHandle = {};
+// @ivanv: fucking stupid
+fn void() {}
+
+#[main(heap_size = 0x10000)]
+fn main() -> CopyHandler {
+    debug_println!("RUST COPIER init");
+
+    let region_shared_dma_rx_cli = unsafe {
+        declare_memory_region! {
+            <[u8], ReadWrite>(shared_dma_rx_cli, REGION_SIZE)
+        }
+    };
+    let region_shared_dma_rx = unsafe {
+        declare_memory_region! {
+            <[u8], ReadWrite>(shared_dma_rx, REGION_SIZE)
+        }
+    };
+    let region_rx_free_mux = unsafe {
+        declare_memory_region! {
+            <RingBuffer, ReadWrite>(rx_free_mux, REGION_SIZE)
+        }
+    };
+    let region_rx_used_mux = unsafe {
+        declare_memory_region! {
+            <RingBuffer, ReadWrite>(rx_used_mux, REGION_SIZE)
+        }
+    };
+    let region_rx_free_cli = unsafe {
+        declare_memory_region! {
+            <RingBuffer, ReadWrite>(rx_free_cli, REGION_SIZE)
+        }
+    };
+    let region_rx_used_cli = unsafe {
+        declare_memory_region! {
+            <RingBuffer, ReadWrite>(rx_used_cli, REGION_SIZE)
+        }
+    };
+
+    /* Set up ring buffers shared between the RX multiplexor and the client. */
+    let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
+    /* For the client shared rings, we are trusting the client will initialise the write_idx and read_idx. */
+    let mut rx_ring_cli = ring_init(region_rx_free_cli, region_rx_free_cli, void, false);
+
+    /* Enqueue free buffers for the mux to access */
+    // for i in 0..NUM_BUFFERS {
+    //     let _ = shared_dma_vaddr_mux + (BUF_SIZE * i);
+    //     // let err = enqueue_free(&rx_ring_mux, addr, BUF_SIZE, NULL);
+    //     // assert(!err);
+    // }
+
+    CopyHandler {
+        region_shared_dma_rx_cli,
+        region_shared_dma_rx,
+        region_rx_free_mux,
+        region_rx_used_mux,
+        region_rx_free_cli,
+        region_rx_used_cli,
+    }
+}
+
+struct CopyHandler {
+    region_shared_dma_rx_cli: MemoryRegion<[u8], ReadWrite>,
+    region_shared_dma_rx: MemoryRegion<[u8], ReadWrite>,
+    region_rx_free_mux: MemoryRegion<RingBuffer, ReadWrite>,
+    region_rx_used_mux: MemoryRegion<RingBuffer, ReadWrite>,
+    region_rx_free_cli: MemoryRegion<RingBuffer, ReadWrite>,
+    region_rx_used_cli: MemoryRegion<RingBuffer, ReadWrite>,
+}
+
+impl Handler for CopyHandler {
+    type Error = !;
+
+    fn notified(&mut self, channel: Channel) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+// static rx_ring_mux: RingHandle = {};
+// static rx_ring_cli: RingHandle = {};
 
 // void process_rx_complete(void)
 // {
