@@ -62,9 +62,9 @@ fn main() -> CopyHandler {
     };
 
     /* Set up ring buffers shared between the RX multiplexor and the client. */
-    let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
+    // let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
     /* For the client shared rings, we are trusting the client will initialise the write_idx and read_idx. */
-    let mut rx_ring_cli = ring_init(region_rx_free_cli, region_rx_free_cli, void, false);
+    // let mut rx_ring_cli = ring_init(region_rx_free_cli, region_rx_free_cli, void, false);
 
     /* Enqueue free buffers for the mux to access */
     // for i in 0..NUM_BUFFERS {
@@ -95,7 +95,7 @@ struct CopyHandler {
 impl Handler for CopyHandler {
     type Error = !;
 
-    fn notified(&mut self, channel: Channel) -> Result<(), Self::Error> {
+    fn notified(&mut self, _: Channel) -> Result<(), Self::Error> {
         Ok(())
     }
 }

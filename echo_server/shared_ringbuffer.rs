@@ -16,11 +16,11 @@ const RING_SIZE: u32 = 512;
 
 /* Buffer descriptor */
 #[derive(AsBytes, FromBytes)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct BuffDesc {
     encoded_addr: usize, /* encoded dma addresses */
     cookie: usize, /* index into client side metadata */
-    len: u32,            /* associated memory lengths */
+    len: usize,            /* associated memory lengths */ // @ivanv changed from u32 to usize to not have to pack struct
 }
 
 /* Circular buffer containing descriptors */
@@ -37,9 +37,9 @@ type Notify = fn();
 
 /* A ring handle for enqueing/dequeuing into  */
 pub struct RingHandle<'a> {
-    pub free_ring: Volatile<&'a mut RingBuffer>,
-    pub used_ring: Volatile<&'a mut RingBuffer>,
-    /* Function to be used to signal that work is queued in the used_ring */
+    pub free: Volatile<&'a mut RingBuffer>,
+    pub used: Volatile<&'a mut RingBuffer>,
+    /* Function to be used to signal that work is queued in the used ring */
     notify: Notify,
 }
 
@@ -50,7 +50,7 @@ pub struct RingHandle<'a> {
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-pub fn ring_empty(ring: Volatile<&mut RingBuffer>) -> bool {
+pub fn ring_empty(ring: &Volatile<&mut RingBuffer>) -> bool {
     return ring_size(ring) == 0;
 }
 
@@ -61,12 +61,12 @@ pub fn ring_empty(ring: Volatile<&mut RingBuffer>) -> bool {
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-pub fn ring_full(ring: Volatile<&mut RingBuffer>) -> bool
+pub fn ring_full(ring: &Volatile<&mut RingBuffer>) -> bool
 {
     return ring_size(ring) == RING_SIZE - 1;
 }
 
-pub fn ring_size(ring: Volatile<&mut RingBuffer>) -> u32
+pub fn ring_size(ring: &Volatile<&mut RingBuffer>) -> u32
 {
     let read_idx = ring.map(|r| & r.read_idx);
     let write_idx = ring.map(|r| & r.write_idx);
@@ -94,30 +94,30 @@ pub fn notify(ring: &RingHandle) {
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn enqueue(ring: Volatile<&mut RingBuffer>, buffer: usize, len: u32, cookie: usize) -> Result<(), &'static str>
+pub fn enqueue(ring: &mut Volatile<&mut RingBuffer>, buffer_addr: usize, len: usize, cookie: usize) -> Result<(), &'static str>
 {
-    assert!(buffer != 0);
+    assert!(buffer_addr != 0);
     if ring_full(ring) {
         return Err("Trying to enqueue onto a full ring");
     }
 
-    unsafe {
-        let mut write_idx = ring.map_mut(|r| &mut r.write_idx);
-        let mut buffers = ring.map_mut(|r| &mut r.buffers);
-        let mut buffer = buffers.as_slice().index_mut((write_idx.read() % RING_SIZE) as usize);
+    let write_idx = ring.map(|r| &r.write_idx).read();
+    let mut buffers = ring.map_mut(|r| &mut r.buffers);
+    let mut buffers_slice = buffers.as_mut_slice();
+    let mut buffer = buffers_slice.index_mut((write_idx % RING_SIZE) as usize);
 
-        let mut encoded_addr = buffer.map_mut(|b| &mut b.encoded_addr);
-        encoded_addr.write(buffer);
+    let mut buffer_encoded_addr = buffer.map_mut(|b| &mut b.encoded_addr);
+    buffer_encoded_addr.write(buffer_addr);
 
-        let mut len = buffer.map_mut(|b| &mut b.len);
-        len.write(len);
+    let mut buffer_len = buffer.map_mut(|b| &mut b.len);
+    buffer_len.write(len);
 
-        let mut cookie = buffer.map_mut(|b| &mut b.cookie);
-        cookie.write(cookie);
+    let mut buffer_cookie = buffer.map_mut(|b| &mut b.cookie);
+    buffer_cookie.write(cookie);
 
-        // THREAD_MEMORY_RELEASE();
-        write_idx.write(write_idx.read() + 1);
-    }
+    // THREAD_MEMORY_RELEASE();
+    let mut write_idx_mut = ring.map_mut(|r| &mut r.write_idx);
+    write_idx_mut.update(|v| *v += 1);
 
     Ok(())
 }
@@ -132,33 +132,31 @@ pub fn enqueue(ring: Volatile<&mut RingBuffer>, buffer: usize, len: u32, cookie:
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue(ring: Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut u32, cookie: &mut usize) -> Result<(), &'static str>
+pub fn dequeue(ring: &mut Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str>
 {
-    if ring_empty(ring) {
+    if ring_empty(&ring) {
         return Err("Trying to dequeue from an empty ring");
     }
 
-    let mut read_idx = ring.map_mut(|r| &mut r.read_idx);
+    let read_idx = ring.map_mut(|r| &mut r.read_idx).read();
     let buffers = ring.map(|r| &r.buffers);
-    let buffer = buffers.as_slice().index((read_idx.read() % RING_SIZE) as usize);
+    let buffers_slice = buffers.as_slice();
+    let buffer = buffers_slice.index((read_idx % RING_SIZE) as usize);
 
     // assert!((*ring).buffers[idx].encoded_addr != 0);
 
-    *addr = encoded_addr.read();
-    *len = buffer.len;
-    *cookie = buffer.cookie;
+    let buffer_encoded_addr = buffer.map(|b| &b.encoded_addr);
+    *addr = buffer_encoded_addr.read();
 
-    let mut encoded_addr = buffer.map_mut(|b| &mut b.encoded_addr);
-    encoded_addr.write(buffer);
+    let buffer_len = buffer.map(|b| &b.len);
+    *len = buffer_len.read();
 
-    let mut len = buffer.map_mut(|b| &mut b.len);
-    len.write(len);
-
-    let mut cookie = buffer.map_mut(|b| &mut b.cookie);
-    cookie.write(cookie);
+    let buffer_cookie = buffer.map(|b| &b.cookie);
+    *cookie = buffer_cookie.read();
 
     // THREAD_MEMORY_RELEASE();
-    read_idx.write(read_idx.read() + 1);
+    let mut read_idx_mut = ring.map_mut(|r| &mut r.read_idx);
+    read_idx_mut.update(|v| *v += 1);
 
     Ok(())
 }
@@ -174,8 +172,8 @@ pub fn dequeue(ring: Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut u32,
  *
  * @return -1 when ring is full, 0 on success.
  */
-pub fn enqueue_free(ring_handle: &mut RingHandle, addr: usize, len: u32, cookie: usize) -> Result<(), &'static str> {
-    return enqueue(ring_handle.free_ring, addr, len, cookie);
+pub fn enqueue_free(ring_handle: &mut RingHandle, addr: usize, len: usize, cookie: usize) -> Result<(), &'static str> {
+    return enqueue(&mut ring_handle.free, addr, len, cookie);
 }
 
 /**
@@ -189,8 +187,8 @@ pub fn enqueue_free(ring_handle: &mut RingHandle, addr: usize, len: u32, cookie:
  *
  * @return -1 when ring is full, 0 on success.
  */
-pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: u32, cookie: usize) -> Result<(), &'static str> {
-    return enqueue(ring_handle.used_ring, addr, len, cookie);
+pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: usize, cookie: usize) -> Result<(), &'static str> {
+    return enqueue(&mut ring_handle.used, addr, len, cookie);
 }
 
 /**
@@ -203,8 +201,8 @@ pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: u32, cookie:
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut u32, cookie: &mut usize) -> Result<(), &'static str> {
-    return dequeue(ring.free_ring, addr, len, cookie);
+pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
+    return dequeue(&mut ring.free, addr, len, cookie);
 }
 
 /**
@@ -217,8 +215,8 @@ pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut u32, cook
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut u32, cookie: &mut usize) -> Result<(), &'static str> {
-    return dequeue(ring.used_ring, addr, len, cookie);
+pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
+    return dequeue(&mut ring.used, addr, len, cookie);
 }
 
 /**
@@ -232,21 +230,17 @@ pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut u32, cook
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
 pub fn ring_init<'a>(free: Volatile<&'a mut RingBuffer>, used: Volatile<&'a mut RingBuffer>, notify: Notify, buffer_init: bool) -> RingHandle<'a> {
-    let ring = RingHandle {
-        free_ring: free,
-        used_ring: used,
+    let mut ring = RingHandle {
+        free: free,
+        used: used,
         notify: notify
     };
 
-    let free_write_idx = free.map_mut(|f| &mut f.write_idx);
-    let free_read_idx = free.map_mut(|f| &mut f.write_idx);
-    let used_write_idx = free.map_mut(|f| &mut f.write_idx);
-    let used_read_idx = free.map_mut(|f| &mut f.write_idx);
     if buffer_init {
-        free_write_idx.write(0);
-        free_read_idx.write(0);
-        used_write_idx.write(0);
-        used_read_idx.write(0);
+        ring.free.map_mut(|r| &mut r.write_idx).write(0);
+        ring.free.map_mut(|r| &mut r.read_idx).write(0);
+        ring.used.map_mut(|r| &mut r.write_idx).write(0);
+        ring.used.map_mut(|r| &mut r.read_idx).write(0);
     }
 
     ring
