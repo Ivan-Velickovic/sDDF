@@ -2,12 +2,10 @@
 #![no_main]
 #![feature(never_type)]
 
-extern crate alloc;
-
 mod shared_ringbuffer;
 
 use sel4cp::{debug_println, main, Handler, Channel};
-use shared_ringbuffer::{ring_init, RingBuffer};
+use shared_ringbuffer::{ring_init, enqueue_free, RingBuffer, RingHandle};
 use sel4cp::memory_region::{
     declare_memory_region, MemoryRegion, ReadWrite,
 };
@@ -23,23 +21,16 @@ const SHARED_DMA_SIZE: usize = BUF_SIZE * NUM_BUFFERS;
 
 static mut initialised: bool = false;
 
+const SHARED_DMA_MUX_START: usize = 0x2_400_000;
+const SHARED_DMA_CLIENT_START: usize = 0x2_800_000;
+
 // @ivanv: fucking stupid
 fn void() {}
 
-#[main(heap_size = 0x10000)]
+#[main]
 fn main() -> CopyHandler {
     debug_println!("RUST COPIER init");
 
-    let region_shared_dma_rx_cli = unsafe {
-        declare_memory_region! {
-            <[u8], ReadWrite>(shared_dma_rx_cli, REGION_SIZE)
-        }
-    };
-    let region_shared_dma_rx = unsafe {
-        declare_memory_region! {
-            <[u8], ReadWrite>(shared_dma_rx, REGION_SIZE)
-        }
-    };
     let region_rx_free_mux = unsafe {
         declare_memory_region! {
             <RingBuffer, ReadWrite>(rx_free_mux, REGION_SIZE)
@@ -62,34 +53,29 @@ fn main() -> CopyHandler {
     };
 
     /* Set up ring buffers shared between the RX multiplexor and the client. */
-    // let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
+    let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
     /* For the client shared rings, we are trusting the client will initialise the write_idx and read_idx. */
-    // let mut rx_ring_cli = ring_init(region_rx_free_cli, region_rx_free_cli, void, false);
+    let mut rx_ring_cli = ring_init(region_rx_free_cli, region_rx_used_cli, void, false);
 
     /* Enqueue free buffers for the mux to access */
-    // for i in 0..NUM_BUFFERS {
-    //     let _ = shared_dma_vaddr_mux + (BUF_SIZE * i);
-    //     // let err = enqueue_free(&rx_ring_mux, addr, BUF_SIZE, NULL);
-    //     // assert(!err);
-    // }
+    for i in 0..NUM_BUFFERS {
+        let addr = SHARED_DMA_MUX_START + (BUF_SIZE * i);
+        let res = enqueue_free(&mut rx_ring_mux, addr, BUF_SIZE, 0);
+        if res.is_err() {
+            debug_println!("COPIER|ERROR: could not enqueue into RX MUX ring: addr is {}, i is: {}", addr, i);
+            debug_println!("Reason for enqueue fail: {}", res.unwrap_err());
+        }
+    }
 
     CopyHandler {
-        region_shared_dma_rx_cli,
-        region_shared_dma_rx,
-        region_rx_free_mux,
-        region_rx_used_mux,
-        region_rx_free_cli,
-        region_rx_used_cli,
+        rx_ring_mux,
+        rx_ring_cli
     }
 }
 
 struct CopyHandler {
-    region_shared_dma_rx_cli: MemoryRegion<[u8], ReadWrite>,
-    region_shared_dma_rx: MemoryRegion<[u8], ReadWrite>,
-    region_rx_free_mux: MemoryRegion<RingBuffer, ReadWrite>,
-    region_rx_used_mux: MemoryRegion<RingBuffer, ReadWrite>,
-    region_rx_free_cli: MemoryRegion<RingBuffer, ReadWrite>,
-    region_rx_used_cli: MemoryRegion<RingBuffer, ReadWrite>,
+    rx_ring_mux: RingHandle<'static>,
+    rx_ring_cli: RingHandle<'static>,
 }
 
 impl Handler for CopyHandler {

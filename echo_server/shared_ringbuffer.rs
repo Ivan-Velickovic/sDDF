@@ -61,17 +61,16 @@ pub fn ring_empty(ring: &Volatile<&mut RingBuffer>) -> bool {
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-pub fn ring_full(ring: &Volatile<&mut RingBuffer>) -> bool
-{
-    return ring_size(ring) == RING_SIZE - 1;
+pub fn ring_full(ring: &Volatile<&mut RingBuffer>) -> bool {
+    ring_size(ring) == RING_SIZE - 1
 }
 
-pub fn ring_size(ring: &Volatile<&mut RingBuffer>) -> u32
-{
-    let read_idx = ring.map(|r| & r.read_idx);
-    let write_idx = ring.map(|r| & r.write_idx);
-    assert!(write_idx.read() - read_idx.read() >= 0);
-    return write_idx.read() - read_idx.read();
+pub fn ring_size(ring: &Volatile<&mut RingBuffer>) -> u32 {
+    let read_idx = ring.map(|r| & r.read_idx).read();
+    let write_idx = ring.map(|r| & r.write_idx).read();
+    assert!(write_idx - read_idx >= 0);
+
+    write_idx - read_idx
 }
 
 /**
@@ -173,7 +172,7 @@ pub fn dequeue(ring: &mut Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut
  * @return -1 when ring is full, 0 on success.
  */
 pub fn enqueue_free(ring_handle: &mut RingHandle, addr: usize, len: usize, cookie: usize) -> Result<(), &'static str> {
-    return enqueue(&mut ring_handle.free, addr, len, cookie);
+    enqueue(&mut ring_handle.free, addr, len, cookie)
 }
 
 /**
@@ -188,7 +187,7 @@ pub fn enqueue_free(ring_handle: &mut RingHandle, addr: usize, len: usize, cooki
  * @return -1 when ring is full, 0 on success.
  */
 pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: usize, cookie: usize) -> Result<(), &'static str> {
-    return enqueue(&mut ring_handle.used, addr, len, cookie);
+    enqueue(&mut ring_handle.used, addr, len, cookie)
 }
 
 /**
@@ -202,7 +201,7 @@ pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: usize, cooki
  * @return -1 when ring is empty, 0 on success.
  */
 pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
-    return dequeue(&mut ring.free, addr, len, cookie);
+    dequeue(&mut ring.free, addr, len, cookie)
 }
 
 /**
@@ -216,7 +215,7 @@ pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, co
  * @return -1 when ring is empty, 0 on success.
  */
 pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
-    return dequeue(&mut ring.used, addr, len, cookie);
+    dequeue(&mut ring.used, addr, len, cookie)
 }
 
 /**

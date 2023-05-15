@@ -14,6 +14,3 @@ zerocopy = "0.6.1"
 [dependencies.sel4cp]
 git = "https://gitlab.com/coliasgroup/rust-seL4"
 rev = "dd01d196cba53ce0545f716e4d4a59c9cd49e620"
-features = ["alloc"]
-
-
