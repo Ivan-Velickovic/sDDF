@@ -68,6 +68,11 @@ RUST_OPTIONS := \
 	--target $(RUST_SEL4CP_TARGET) \
 	--release \
 	--target-dir $(abspath $(TARGET_DIR)) \
+
+RUST_DOC_OPTIONS := $(RUST_OPTIONS)
+
+RUST_BUILD_OPTIONS := \
+	$(RUST_OPTIONS) \
 	--out-dir $(BUILD_DIR)
 
 # Rust compilation stuff ends
@@ -139,6 +144,10 @@ DEPS := $(OBJS:.o=.d)
 all: $(IMAGE_FILE)
 -include $(DEPS)
 
+doc:
+	$(RUST_ENV) \
+		cargo doc $(RUST_DOC_OPTIONS) --open
+
 $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 	mkdir -p `dirname $(BUILD_DIR)/$*.o`
 	$(CC) -c $(CFLAGS) $< -o $(BUILD_DIR)/$*.o
@@ -161,9 +170,9 @@ $(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
 $(BUILD_DIR)/copy.elf: $(addprefix $(BUILD_DIR)/, $(COPY_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/copy_rs.elf: copy_rs.rs shared_ringbuffer.rs
+$(BUILD_DIR)/copy_rs.elf: copy.rs shared_ringbuffer.rs
 	$(RUST_ENV) \
-		cargo build $(RUST_OPTIONS)
+		cargo build $(RUST_BUILD_OPTIONS)
 
 $(BUILD_DIR)/benchmark.elf: $(addprefix $(BUILD_DIR)/, $(BENCH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

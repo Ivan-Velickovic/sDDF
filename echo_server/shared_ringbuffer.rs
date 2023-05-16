@@ -3,27 +3,28 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
-
-// @ivanv: figure out cookie pointer
-// @ivanv: make sure to add thread memory release barrier
+// @ivanv: the buffdesc in the C version is not packed, but it could be
 
 use core::assert;
-// use core::ffi::c_void;
+use core::intrinsics;
 use zerocopy::{AsBytes, FromBytes};
-use sel4cp::memory_region::{Volatile};
+use sel4cp::memory_region::{Shared};
 
 const RING_SIZE: u32 = 512;
 
-/* Buffer descriptor */
+/// Buffer descriptor
 #[derive(AsBytes, FromBytes)]
 #[repr(C)]
 pub struct BuffDesc {
-    encoded_addr: usize, /* encoded dma addresses */
-    cookie: usize, /* index into client side metadata */
-    len: usize,            /* associated memory lengths */ // @ivanv changed from u32 to usize to not have to pack struct
+    /// Encoded DMA address
+    pub encoded_addr: usize,
+    /// Index into client side metadata
+    pub cookie: usize,
+    /// Associated memory lengths
+    pub len: usize,
 }
 
-/* Circular buffer containing descriptors */
+/// Circular buffer containing descriptors
 #[derive(AsBytes, FromBytes)]
 #[repr(C)]
 pub struct RingBuffer {
@@ -37,38 +38,29 @@ type Notify = fn();
 
 /* A ring handle for enqueing/dequeuing into  */
 pub struct RingHandle<'a> {
-    pub free: Volatile<&'a mut RingBuffer>,
-    pub used: Volatile<&'a mut RingBuffer>,
-    /* Function to be used to signal that work is queued in the used ring */
+    /// Free ring, contains buffers that are empty and available for use.
+    pub free: Shared<&'a mut RingBuffer>,
+    /// Used ring, contains buffers that are ready for processing.
+    pub used: Shared<&'a mut RingBuffer>,
+    /// Function to be used to signal that work is queued in the used ring
     notify: Notify,
 }
 
-/**
- * Check if the ring buffer is empty.
- *
- * @param ring ring buffer to check.
- *
- * @return true indicates the buffer is empty, false otherwise.
- */
-pub fn ring_empty(ring: &Volatile<&mut RingBuffer>) -> bool {
+/// Check if the ring buffer is empty
+pub fn ring_empty(ring: &Shared<&mut RingBuffer>) -> bool {
     return ring_size(ring) == 0;
 }
 
-/**
- * Check if the ring buffer is full
- *
- * @param ring ring buffer to check.
- *
- * @return true indicates the buffer is full, false otherwise.
- */
-pub fn ring_full(ring: &Volatile<&mut RingBuffer>) -> bool {
+/// Check if the ring buffer is full
+pub fn ring_full(ring: &Shared<&mut RingBuffer>) -> bool {
     ring_size(ring) == RING_SIZE - 1
 }
 
-pub fn ring_size(ring: &Volatile<&mut RingBuffer>) -> u32 {
+/// Get the number of buffers in the ring
+pub fn ring_size(ring: &Shared<&mut RingBuffer>) -> u32 {
     let read_idx = ring.map(|r| & r.read_idx).read();
     let write_idx = ring.map(|r| & r.write_idx).read();
-    assert!(write_idx - read_idx >= 0);
+    assert!(write_idx >= read_idx);
 
     write_idx - read_idx
 }
@@ -83,17 +75,13 @@ pub fn notify(ring: &RingHandle) {
     return (ring.notify)();
 }
 
-/**
- * Enqueue an element to a ring buffer
- *
- * @param ring Ring buffer to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
- *
- * @return -1 when ring is empty, 0 on success.
- */
-pub fn enqueue(ring: &mut Volatile<&mut RingBuffer>, buffer_addr: usize, len: usize, cookie: usize) -> Result<(), &'static str>
+/// Enqueue an element to a ring buffer
+/// @param ring Ring buffer to enqueue into.
+/// @param buffer address into shared memory where data is stored.
+/// @param len length of data inside the buffer above.
+/// @param cookie optional pointer to data required on dequeueing.
+/// @return -1 when ring is empty, 0 on success.
+pub fn enqueue(ring: &mut Shared<&mut RingBuffer>, buffer_addr: usize, len: usize, cookie: usize) -> Result<(), &'static str>
 {
     assert!(buffer_addr != 0);
     if ring_full(ring) {
@@ -114,8 +102,10 @@ pub fn enqueue(ring: &mut Volatile<&mut RingBuffer>, buffer_addr: usize, len: us
     let mut buffer_cookie = buffer.map_mut(|b| &mut b.cookie);
     buffer_cookie.write(cookie);
 
-    // THREAD_MEMORY_RELEASE();
     let mut write_idx_mut = ring.map_mut(|r| &mut r.write_idx);
+    unsafe {
+        intrinsics::atomic_fence_release();
+    }
     write_idx_mut.update(|v| *v += 1);
 
     Ok(())
@@ -131,7 +121,7 @@ pub fn enqueue(ring: &mut Volatile<&mut RingBuffer>, buffer_addr: usize, len: us
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue(ring: &mut Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str>
+pub fn dequeue(ring: &mut Shared<&mut RingBuffer>) -> Result<BuffDesc, &'static str>
 {
     if ring_empty(&ring) {
         return Err("Trying to dequeue from an empty ring");
@@ -145,19 +135,25 @@ pub fn dequeue(ring: &mut Volatile<&mut RingBuffer>, addr: &mut usize, len: &mut
     // assert!((*ring).buffers[idx].encoded_addr != 0);
 
     let buffer_encoded_addr = buffer.map(|b| &b.encoded_addr);
-    *addr = buffer_encoded_addr.read();
+    let addr = buffer_encoded_addr.read();
 
     let buffer_len = buffer.map(|b| &b.len);
-    *len = buffer_len.read();
+    let len = buffer_len.read();
 
     let buffer_cookie = buffer.map(|b| &b.cookie);
-    *cookie = buffer_cookie.read();
+    let cookie = buffer_cookie.read();
 
-    // THREAD_MEMORY_RELEASE();
     let mut read_idx_mut = ring.map_mut(|r| &mut r.read_idx);
+    unsafe {
+        intrinsics::atomic_fence_release();
+    }
     read_idx_mut.update(|v| *v += 1);
 
-    Ok(())
+    Ok(BuffDesc {
+        encoded_addr: addr,
+        cookie: cookie,
+        len: len
+    })
 }
 
 /**
@@ -200,8 +196,8 @@ pub fn enqueue_used(ring_handle: &mut RingHandle, addr: usize, len: usize, cooki
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
-    dequeue(&mut ring.free, addr, len, cookie)
+pub fn dequeue_free(ring: &mut RingHandle) -> Result<BuffDesc, &'static str> {
+    dequeue(&mut ring.free)
 }
 
 /**
@@ -214,8 +210,8 @@ pub fn dequeue_free(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, co
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, cookie: &mut usize) -> Result<(), &'static str> {
-    dequeue(&mut ring.used, addr, len, cookie)
+pub fn dequeue_used(ring: &mut RingHandle) -> Result<BuffDesc, &'static str> {
+    dequeue(&mut ring.used)
 }
 
 /**
@@ -228,7 +224,7 @@ pub fn dequeue_used(ring: &mut RingHandle, addr: &mut usize, len: &mut usize, co
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-pub fn ring_init<'a>(free: Volatile<&'a mut RingBuffer>, used: Volatile<&'a mut RingBuffer>, notify: Notify, buffer_init: bool) -> RingHandle<'a> {
+pub fn ring_init<'a>(free: Shared<&'a mut RingBuffer>, used: Shared<&'a mut RingBuffer>, notify: Notify, buffer_init: bool) -> RingHandle<'a> {
     let mut ring = RingHandle {
         free: free,
         used: used,
