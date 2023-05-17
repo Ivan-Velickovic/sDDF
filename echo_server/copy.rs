@@ -15,6 +15,7 @@ use shared_ringbuffer::{
 use sel4cp::memory_region::{
     declare_memory_region, ReadWrite,
 };
+use core::intrinsics;
 
 const REGION_SIZE: usize = 0x200_000;
 
@@ -109,8 +110,11 @@ fn process_rx_complete(rx_ring_mux: &mut RingHandle, rx_ring_cli: &mut RingHandl
             debug_println!("COPIER|ERROR: Client buffer length is less than MUX buffer length. Client length: {}, MUX length: {}", client_len, mux_len);
         }
         // copy the data over to the clients address space.
-        // @ivanv: do the memcpy
-        // memcpy((void *)client_addr, (void *)mux_addr, mux_len);
+        unsafe {
+            let mux_ptr = mux_addr as *const u8;
+            let client_ptr = client_addr as *mut u8;
+            intrinsics::copy_nonoverlapping(mux_ptr, client_ptr, mux_len);
+        }
 
         /* Now that we've copied the data, enqueue the buffer to the client's used ring. */
         let _ = enqueue_used(rx_ring_cli, client_addr, mux_len, client_cookie);
@@ -160,10 +164,12 @@ impl Handler for CopyHandler {
 
         match channel {
             CLIENT | MUX_RX => process_rx_complete(&mut self.rx_ring_mux, &mut self.rx_ring_cli),
-            _ => debug_println!("COPIER|ERROR: unexpected notification from channel: {:?}\n", channel)
+            _ => {
+                debug_println!("COPIER|ERROR: unexpected notification from channel: {:?}\n", channel);
+            }
         }
 
-        // @ivanv: should probably not always return an error
+        // @ivanv: should probably not always return an ok
         Ok(())
     }
 }
