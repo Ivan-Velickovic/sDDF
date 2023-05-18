@@ -26,6 +26,7 @@ const BUF_SIZE: usize = 2048;
 const NUM_BUFFERS: usize = 512;
 
 const SHARED_DMA_SIZE: usize = BUF_SIZE * NUM_BUFFERS;
+// @ivanv: todo, these shouldn't be hardcoded
 const SHARED_DMA_MUX_START: usize = 0x2_400_000;
 const SHARED_DMA_CLIENT_START: usize = 0x2_800_000;
 const SHARED_DMA_CLIENT_END: usize = SHARED_DMA_CLIENT_START + SHARED_DMA_SIZE;
@@ -36,6 +37,18 @@ fn void() {}
 #[protection_domain]
 fn init() -> CopyHandler {
     debug_println!("RUST COPIER init");
+
+    let _ = unsafe {
+        declare_memory_region! {
+            <[u8], ReadWrite>(shared_dma_vaddr_cli, REGION_SIZE)
+        }
+    };
+
+    let _ = unsafe {
+        declare_memory_region! {
+            <[u8], ReadWrite>(shared_dma_vaddr_mux, REGION_SIZE)
+        }
+    };
 
     let region_rx_free_mux = unsafe {
         declare_memory_region! {
@@ -58,12 +71,14 @@ fn init() -> CopyHandler {
         }
     };
 
+    debug_println!("COPIER| setting up rings");
     /* Set up ring buffers shared between the RX multiplexor and the client. */
     let mut rx_ring_mux = ring_init(region_rx_free_mux, region_rx_used_mux, void, true);
     /* For the client shared rings, we are trusting the client will initialise the write_idx and read_idx. */
     let rx_ring_cli = ring_init(region_rx_free_cli, region_rx_used_cli, void, false);
 
     /* Enqueue free buffers for the mux to access */
+    debug_println!("COPIER| setting shared DMA buffers");
     for i in 0..NUM_BUFFERS {
         let addr = SHARED_DMA_MUX_START + (BUF_SIZE * i);
         let res = enqueue_free(&mut rx_ring_mux, addr, BUF_SIZE, 0);
