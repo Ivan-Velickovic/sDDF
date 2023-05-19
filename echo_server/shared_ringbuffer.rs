@@ -132,10 +132,9 @@ pub fn dequeue(ring: &mut Shared<&mut RingBuffer>) -> Result<BuffDesc, &'static 
     let buffers_slice = buffers.as_slice();
     let buffer = buffers_slice.index((read_idx % RING_SIZE) as usize);
 
-    // assert!((*ring).buffers[idx].encoded_addr != 0);
-
     let buffer_encoded_addr = buffer.map(|b| &b.encoded_addr);
     let addr = buffer_encoded_addr.read();
+    assert!(addr != 0);
 
     let buffer_len = buffer.map(|b| &b.len);
     let len = buffer_len.read();
