@@ -139,10 +139,10 @@ fn process_rx_complete(rx_ring_mux: &mut RingHandle, rx_ring_cli: &mut RingHandl
         }
 
         /* Now that we've copied the data, enqueue the buffer to the client's used ring. */
-        let _ = enqueue_used(rx_ring_cli, client_addr, mux_len, client_cookie);
+        enqueue_used(rx_ring_cli, client_addr, mux_len, client_cookie).unwrap();
         /* enqueue the old buffer back to dev_rx_ring.free so the driver can use it again. */
         // @ivanv: why don't we use client_len instead of BUF_SIZE?
-        let _ = enqueue_free(rx_ring_mux, mux_addr, BUF_SIZE, mux_cookie);
+        enqueue_free(rx_ring_mux, mux_addr, BUF_SIZE, mux_cookie).unwrap();
 
         enqueued += 1;
     }
@@ -188,10 +188,10 @@ impl Handler for CopyHandler {
             CLIENT | MUX_RX => process_rx_complete(&mut self.rx_ring_mux, &mut self.rx_ring_cli),
             _ => {
                 debug_println!("COPIER|ERROR: unexpected notification from channel: {:?}\n", channel);
+                unreachable!();
             }
         }
 
-        // @ivanv: should probably not always return an ok
         Ok(())
     }
 }
