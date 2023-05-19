@@ -40,9 +40,13 @@ RINGBUFFERDIR=libsharedringbuffer
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf copy_rs.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L.
 LIBS := -lsel4cp -Tsel4cp.ld -lc
+
+ifeq ($(SEL4CP_CONFIG),benchmark)
+	CFLAGS += -DNO_ASSERT
+endif
 
 ########################
 # Rust compilation stuff
