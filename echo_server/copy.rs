@@ -93,6 +93,7 @@ fn init() -> CopyHandler {
             debug_println!("Reason for enqueue fail: {}", res.unwrap_err());
         }
     }
+    assert!(ring_full(&rx_ring_mux.free));
 
     CopyHandler {
         rx_ring_mux,
