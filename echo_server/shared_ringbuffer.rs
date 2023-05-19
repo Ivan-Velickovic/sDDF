@@ -18,10 +18,10 @@ const RING_SIZE: u32 = 512;
 pub struct BuffDesc {
     /// Encoded DMA address
     pub encoded_addr: usize,
-    /// Index into client side metadata
-    pub cookie: usize,
     /// Associated memory lengths
     pub len: usize,
+    /// Index into client side metadata
+    pub cookie: usize,
 }
 
 /// Circular buffer containing descriptors
