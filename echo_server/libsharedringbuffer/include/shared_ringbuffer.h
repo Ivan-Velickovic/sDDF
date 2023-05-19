@@ -20,7 +20,7 @@ typedef void (*notify_fn)(void);
 /* Buffer descriptor */
 typedef struct buff_desc {
     uintptr_t encoded_addr; /* encoded dma addresses */
-    unsigned int len; /* associated memory lengths */
+    uint64_t len; /* associated memory lengths */
     void *cookie; /* index into client side metadata */
 } buff_desc_t;
 
