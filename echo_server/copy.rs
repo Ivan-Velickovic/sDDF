@@ -50,6 +50,12 @@ fn init() -> CopyHandler {
         }
     };
 
+    let _ = unsafe {
+        declare_memory_region! {
+            <[u8], ReadWrite>(uart_base, 0x10_000)
+        }
+    };
+
     let region_rx_free_mux = unsafe {
         declare_memory_region! {
             <RingBuffer, ReadWrite>(rx_free_mux, REGION_SIZE)
@@ -79,7 +85,7 @@ fn init() -> CopyHandler {
 
     /* Enqueue free buffers for the mux to access */
     debug_println!("COPIER| setting shared DMA buffers");
-    for i in 0..NUM_BUFFERS {
+    for i in 0..NUM_BUFFERS - 1 {
         let addr = SHARED_DMA_MUX_START + (BUF_SIZE * i);
         let res = enqueue_free(&mut rx_ring_mux, addr, BUF_SIZE, 0);
         if res.is_err() {

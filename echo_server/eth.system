@@ -100,7 +100,7 @@
             <map mr="rx_free_cli" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
             <map mr="rx_used_cli" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
 
-            <!-- <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" /> -->
+            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         </protection_domain>
 
         <protection_domain name="mux_tx" priority="100" budget="20000" id="3">
