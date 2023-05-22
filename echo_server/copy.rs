@@ -148,7 +148,7 @@ fn process_rx_complete(rx_ring_mux: &mut RingHandle, rx_ring_cli: &mut RingHandl
     }
 
     if cli_used_was_empty && enqueued > 0 {
-        CLIENT.notify_queue();
+        CLIENT.notify();
     }
 
     /* We only want to signal the mux if the free queue was
@@ -166,7 +166,7 @@ fn process_rx_complete(rx_ring_mux: &mut RingHandle, rx_ring_cli: &mut RingHandl
             // happen first.
             CLIENT.notify();
         }
-        MUX_RX.notify_queue();
+        MUX_RX.notify();
     }
 }
 
