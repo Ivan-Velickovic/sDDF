@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include "eth.h"
 #include "shared_ringbuffer.h"
@@ -282,7 +282,7 @@ handle_rx(volatile struct enet_regs *eth)
      * by caller before the notify causes a context switch.
      */
     if (num && was_empty) {
-        sel4cp_notify(RX_CH);
+        microkit_notify(RX_CH);
     }
 }
 
@@ -411,7 +411,7 @@ complete_tx(volatile struct enet_regs *eth)
     }
 
     if (was_empty && enqueued) {
-        sel4cp_notify(TX_CH);
+        microkit_notify(TX_CH);
     }
 
     /* The only reason to arrive here is when head equals tails. If cnt is not
@@ -451,9 +451,9 @@ static void
 eth_setup(void)
 {
     get_mac_addr(eth, mac);
-    sel4cp_dbg_puts("MAC: ");
+    microkit_dbg_puts("MAC: ");
     dump_mac(mac);
-    sel4cp_dbg_puts("\n");
+    microkit_dbg_puts("\n");
 
     /* set up descriptor rings */
     rx.cnt = RX_COUNT;
@@ -548,9 +548,9 @@ void init_post()
     ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, NULL, 0);
 
     fill_rx_bufs();
-    print(sel4cp_name);
+    print(microkit_name);
     print(": init complete -- waiting for interrupt\n");
-    sel4cp_notify(INIT);
+    microkit_notify(INIT);
 
     /* Now take away our scheduling context. Uncomment this for a passive driver. */
     /* have_signal = true;
@@ -561,7 +561,7 @@ void init_post()
 
 void init(void)
 {
-    print(sel4cp_name);
+    print(microkit_name);
     print(": elf PD init function running\n");
 
     eth_setup();
@@ -570,26 +570,26 @@ void init(void)
 }
 
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (ch) {
         case INIT:
             // return the MAC address.
-            sel4cp_mr_set(0, eth->palr);
-            sel4cp_mr_set(1, eth->paur);
-            return sel4cp_msginfo_new(0, 2);
+            microkit_mr_set(0, eth->palr);
+            microkit_mr_set(1, eth->paur);
+            return microkit_msginfo_new(0, 2);
         case TX_CH:
             handle_tx(eth);
             break;
         default:
-            sel4cp_dbg_puts("Received ppc on unexpected channel ");
+            microkit_dbg_puts("Received ppc on unexpected channel ");
             puthex64(ch);
             break;
     }
-    return sel4cp_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     switch(ch) {
         case IRQ_CH:
@@ -598,7 +598,7 @@ void notified(sel4cp_channel ch)
              * Delay calling into the kernel to ack the IRQ until the next loop
              * in the seL4CP event handler loop.
              */
-            sel4cp_irq_ack_delayed(ch);
+            microkit_irq_ack_delayed(ch);
             break;
         case RX_CH:
             if (initialised) {
@@ -612,9 +612,9 @@ void notified(sel4cp_channel ch)
             handle_tx(eth);
             break;
         default:
-            sel4cp_dbg_puts("eth driver: received notification on unexpected channel: ");
+            microkit_dbg_puts("eth driver: received notification on unexpected channel: ");
             puthex64(ch);
-            sel4cp_dbg_puts("\n");
+            microkit_dbg_puts("\n");
             assert(0);
             break;
     }

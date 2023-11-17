@@ -25,13 +25,13 @@ to the Makefile using the argument `TOOLCHAIN=<PREFIX>`.
 ```
     $ cd echo_server
     $ make BUILD_DIR=<path/to/build> \
-        SEL4CP_SDK=<path/to/core/platform/sdk> \
-        SEL4CP_BOARD=imx8mm_evk SEL4CP_CONFIG=(benchmark/release/debug)
+        MICROKIT_SDK=<path/to/core/platform/sdk> \
+        MICROKIT_BOARD=imx8mm_evk MICROKIT_CONFIG=(benchmark/release/debug)
 ```
 
 ## Benchmarking
 
-In order to run the benchmarks, set `SEL4CP_CONFIG=benchmark`. The
+In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. The
 system has been designed to interact with
 [ipbench](https://sourceforge.net/projects/ipbench/) to take
 measurements.

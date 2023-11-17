@@ -4,22 +4,22 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-# @ivanv: Changes any of the params given e.g SEL4CP_CONFIG,
+# @ivanv: Changes any of the params given e.g MICROKIT_CONFIG,
 # doesn't actually cause a re-compile. We should fix this.
 ifeq ($(strip $(BUILD_DIR)),)
 $(error BUILD_DIR must be specified)
 endif
 
-ifeq ($(strip $(SEL4CP_SDK)),)
-$(error SEL4CP_SDK must be specified)
+ifeq ($(strip $(MICROKIT_SDK)),)
+$(error MICROKIT_SDK must be specified)
 endif
 
-ifeq ($(strip $(SEL4CP_BOARD)),)
-$(error SEL4CP_BOARD must be specified)
+ifeq ($(strip $(MICROKIT_BOARD)),)
+$(error MICROKIT_BOARD must be specified)
 endif
 
-ifeq ($(strip $(SEL4CP_CONFIG)),)
-$(error SEL4CP_CONFIG must be specified)
+ifeq ($(strip $(MICROKIT_CONFIG)),)
+$(error MICROKIT_CONFIG must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
@@ -31,20 +31,20 @@ CPU := cortex-a53
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
-SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
+MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 LWIPDIR=lwip/src
 BENCHDIR=benchmark
 RINGBUFFERDIR=libsharedringbuffer
 
-BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf copy_rs.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L.
-LIBS := -lsel4cp -Tsel4cp.ld -lc
+LIBS := -lmicrokit -Tmicrokit.ld -lc
 
-ifeq ($(SEL4CP_CONFIG),benchmark)
+ifeq ($(MICROKIT_CONFIG),benchmark)
 	CFLAGS += -DNO_ASSERT
 endif
 
@@ -52,16 +52,16 @@ endif
 # Rust compilation stuff
 
 RUST_TARGET_PATH := rust_target
-RUST_SEL4CP_TARGET := aarch64-sel4cp-minimal
+RUST_MICROKIT_TARGET := aarch64-microkit-minimal
 TARGET_DIR := $(BUILD_DIR)/target
 
-SEL4CP_SDK_CONFIG := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/config.json
-SEL4CP_SDK_INCLUDE_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/include
+MICROKIT_SDK_CONFIG := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/config.json
+MICROKIT_SDK_INCLUDE_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/include
 
 RUST_ENV := \
 	RUST_TARGET_PATH=$(abspath $(RUST_TARGET_PATH)) \
-	SEL4_CONFIG=$(abspath $(SEL4CP_SDK_CONFIG)) \
-	SEL4_INCLUDE_DIRS=$(abspath $(SEL4CP_SDK_INCLUDE_DIR))
+	SEL4_CONFIG=$(abspath $(MICROKIT_SDK_CONFIG)) \
+	SEL4_INCLUDE_DIRS=$(abspath $(MICROKIT_SDK_INCLUDE_DIR))
 
 RUST_OPTIONS := \
 	--locked \
@@ -69,7 +69,7 @@ RUST_OPTIONS := \
 	-Z bindeps \
 	-Z build-std=core,alloc,compiler_builtins \
 	-Z build-std-features=compiler-builtins-mem \
-	--target $(RUST_SEL4CP_TARGET) \
+	--target $(RUST_MICROKIT_TARGET) \
 	--release \
 	--target-dir $(abspath $(TARGET_DIR)) \
 
@@ -185,10 +185,10 @@ $(BUILD_DIR)/idle.elf: $(addprefix $(BUILD_DIR)/, $(IDLE_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) eth.system
-	$(SEL4CP_TOOL) eth.system \
+	$(MICROKIT_TOOL) eth.system \
 		--search-path $(BUILD_DIR) \
-		--board $(SEL4CP_BOARD) \
-		--config $(SEL4CP_CONFIG) \
+		--board $(MICROKIT_BOARD) \
+		--config $(MICROKIT_CONFIG) \
 		-o $(IMAGE_FILE) \
 		-r $(REPORT_FILE)
 

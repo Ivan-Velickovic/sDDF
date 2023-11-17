@@ -45,7 +45,7 @@ void process_tx_ready(void)
     }
 
     if ((original_size == 0 || original_size + enqueued != ring_size(state.tx_ring_drv.used_ring)) && enqueued != 0) {
-        sel4cp_notify_delayed(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }
 
@@ -72,11 +72,11 @@ void process_tx_complete(void)
     }
 
     if (enqueued && was_empty) {
-        sel4cp_notify(CLIENT_CH);
+        microkit_notify(CLIENT_CH);
     }
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (ch == CLIENT_CH || ch == DRIVER_CH) {
         process_tx_complete();

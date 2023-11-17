@@ -6,15 +6,15 @@
 
 mod shared_ringbuffer;
 
-use sel4cp::{protection_domain, debug_println, Handler, Channel,};
+extern crate sel4_externally_shared;
+
+use sel4_microkit::{memory_region_symbol, protection_domain, debug_println, Handler, Channel,};
 use shared_ringbuffer::{
     ring_init, ring_size, ring_empty, ring_full,
     enqueue_free, enqueue_used, dequeue_free, dequeue_used,
     RingBuffer, RingHandle, BuffDesc
 };
-use sel4cp::memory_region::{
-    declare_memory_region, ReadWrite,
-};
+use sel4_externally_shared::{ExternallySharedRef};
 use core::intrinsics;
 
 const REGION_SIZE: usize = 0x200_000;
@@ -38,43 +38,35 @@ fn void() {}
 fn init() -> CopyHandler {
     debug_println!("RUST COPIER init");
 
-    let _ = unsafe {
-        declare_memory_region! {
-            <[u8], ReadWrite>(shared_dma_vaddr_cli, REGION_SIZE)
-        }
-    };
+    // let _ = unsafe {
+    //     declare_memory_region! {
+    //         <[u8], ReadWrite>(shared_dma_vaddr_cli, REGION_SIZE)
+    //     }
+    // };
 
-    let _ = unsafe {
-        declare_memory_region! {
-            <[u8], ReadWrite>(shared_dma_vaddr_mux, REGION_SIZE)
-        }
-    };
+    // let _ = unsafe {
+    //     declare_memory_region! {
+    //         <[u8], ReadWrite>(shared_dma_vaddr_mux, REGION_SIZE)
+    //     }
+    // };
 
-    let _ = unsafe {
-        declare_memory_region! {
-            <[u8], ReadWrite>(uart_base, 0x10_000)
-        }
-    };
+    // let _ = unsafe {
+    //     declare_memory_region! {
+    //         <[u8], ReadWrite>(uart_base, 0x10_000)
+    //     }
+    // };
 
     let region_rx_free_mux = unsafe {
-        declare_memory_region! {
-            <RingBuffer, ReadWrite>(rx_free_mux, REGION_SIZE)
-        }
+        ExternallySharedRef::<'static, [u8]>::new(memory_region_symbol!(rx_free_mux: *mut [u8], n = REGION_SIZE));
     };
     let region_rx_used_mux = unsafe {
-        declare_memory_region! {
-            <RingBuffer, ReadWrite>(rx_used_mux, REGION_SIZE)
-        }
+        ExternallySharedRef::<'static, [u8]>::new(memory_region_symbol!(rx_used_mux: *mut [u8], n = REGION_SIZE));
     };
     let region_rx_free_cli = unsafe {
-        declare_memory_region! {
-            <RingBuffer, ReadWrite>(rx_free_cli, REGION_SIZE)
-        }
+        ExternallySharedRef::<'static, [u8]>::new(memory_region_symbol!(rx_free_cli: *mut [u8], n = REGION_SIZE));
     };
     let region_rx_used_cli = unsafe {
-        declare_memory_region! {
-            <RingBuffer, ReadWrite>(rx_used_cli, REGION_SIZE)
-        }
+        ExternallySharedRef::<'static, [u8]>::new(memory_region_symbol!(rx_used_cli: *mut [u8], n = REGION_SIZE));
     };
 
     debug_println!("COPIER| setting up rings");

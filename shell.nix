@@ -1,7 +1,7 @@
 let
     rust_overlay = import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
     pkgs = import <nixpkgs> { overlays = [ rust_overlay ]; };
-    rust = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+    rust = pkgs.rust-bin.fromRustupToolchainFile ./echo_server/rust-toolchain.toml;
     llvm = pkgs.llvmPackages_11;
     aarch64 = import <nixpkgs> {
       crossSystem = { config = "aarch64-none-elf"; };

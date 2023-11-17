@@ -6,7 +6,7 @@
 #pragma once
 
 #include <autoconf.h>
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "lwip/dhcp.h"
 #include "lwip/ip_addr.h"
@@ -15,4 +15,4 @@
 
 void gpt_init(void);
 u32_t sys_now(void);
-void irq(sel4cp_channel ch);
+void irq(microkit_channel ch);

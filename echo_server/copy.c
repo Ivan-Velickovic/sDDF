@@ -80,7 +80,7 @@ void process_rx_complete(void)
     }
 
     if (cli_used_was_empty && enqueued) {
-        sel4cp_notify_delayed(CLIENT_CH);
+        microkit_notify_delayed(CLIENT_CH);
     }
 
     /* We only want to signal the mux if the free queue was
@@ -96,20 +96,20 @@ void process_rx_complete(void)
         if (have_signal) {
             // We need to notify the client, but this should
             // happen first. 
-            sel4cp_notify(CLIENT_CH);
+            microkit_notify(CLIENT_CH);
         }
-        sel4cp_notify_delayed(MUX_RX_CH);
+        microkit_notify_delayed(MUX_RX_CH);
     }
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (!initialised) {
         /*
          * Propogate this down the line to ensure everyone is
          * initliased in correct order.
          */
-        sel4cp_notify(MUX_RX_CH);
+        microkit_notify(MUX_RX_CH);
         initialised = 1;
         return;
     }

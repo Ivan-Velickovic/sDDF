@@ -35,13 +35,13 @@ static void
 dump_mac(uint8_t *mac)
 {
     for (unsigned i = 0; i < 6; i++) {
-        sel4cp_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
-        sel4cp_dbg_putc(hexchar(mac[i] & 0xf));
+        microkit_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
+        microkit_dbg_putc(hexchar(mac[i] & 0xf));
         if (i < 5) {
-            sel4cp_dbg_putc(':');
+            microkit_dbg_putc(':');
         }
     }
-    sel4cp_dbg_putc('\n');
+    microkit_dbg_putc('\n');
 }
 
 int compare_mac(uint8_t *mac1, uint8_t *mac2)
@@ -137,7 +137,7 @@ void process_rx_complete(void)
     /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client]) {
-            sel4cp_notify(client);
+            microkit_notify(client);
         }
     }
 }
@@ -176,19 +176,19 @@ bool process_rx_free(void)
             original_size + enqueued != ring_size(state.rx_ring_drv.free_ring))
             && enqueued != 0) ||
             (dropped != 0 && rx_free_was_empty)) {
-        sel4cp_notify_delayed(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 
     return enqueued;
 }
 
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     if (ch >= NUM_CLIENTS) {
-        sel4cp_dbg_puts("Received ppc on unexpected channel ");
+        microkit_dbg_puts("Received ppc on unexpected channel ");
         puthex64(ch);
-        return sel4cp_msginfo_new(0, 0);
+        return microkit_msginfo_new(0, 0);
     }
     // return the MAC address.
     uint32_t lower = (state.mac_addrs[ch][0] << 24) |
@@ -196,18 +196,18 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
                      (state.mac_addrs[ch][2] << 8) |
                      (state.mac_addrs[ch][3]);
     uint32_t upper = (state.mac_addrs[ch][4] << 24) | (state.mac_addrs[ch][5] << 16);
-    sel4cp_dbg_puts("Mux rx is sending mac: ");
+    microkit_dbg_puts("Mux rx is sending mac: ");
     dump_mac(state.mac_addrs[ch]);
-    sel4cp_mr_set(0, lower);
-    sel4cp_mr_set(1, upper);
-    return sel4cp_msginfo_new(0, 2);
+    microkit_mr_set(0, lower);
+    microkit_mr_set(1, upper);
+    return microkit_msginfo_new(0, 2);
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (!initialised) {
         process_rx_free();
-        sel4cp_notify(DRIVER_CH);
+        microkit_notify(DRIVER_CH);
         initialised = 1;
         return;
     }

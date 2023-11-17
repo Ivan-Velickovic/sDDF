@@ -59,7 +59,7 @@ u32_t sys_now(void)
     }
 }
 
-void irq(sel4cp_channel ch)
+void irq(microkit_channel ch)
 {
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;

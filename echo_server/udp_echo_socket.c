@@ -10,7 +10,7 @@
  * @TAG(DATA61_BSD)
  */
 
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
@@ -27,7 +27,7 @@ static void lwip_udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *
 {
     err_t error = udp_sendto(pcb, p, addr, port);
     if (error) {
-        sel4cp_dbg_puts("Failed to send UDP packet through socket\n");
+        microkit_dbg_puts("Failed to send UDP packet through socket\n");
     }
     pbuf_free(p);
 }

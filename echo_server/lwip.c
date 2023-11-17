@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -93,15 +93,15 @@ LWIP_MEMPOOL_DECLARE(
 static void
 dump_mac(uint8_t *mac)
 {
-    sel4cp_dbg_puts("Lwip MAC: ");
+    microkit_dbg_puts("Lwip MAC: ");
     for (unsigned i = 0; i < 6; i++) {
-        sel4cp_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
-        sel4cp_dbg_putc(hexchar(mac[i] & 0xf));
+        microkit_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
+        microkit_dbg_putc(hexchar(mac[i] & 0xf));
         if (i < 5) {
-            sel4cp_dbg_putc(':');
+            microkit_dbg_putc(':');
         }
     }
-    sel4cp_dbg_putc('\n');
+    microkit_dbg_putc('\n');
 }
 
 static bool notify_rx = false;
@@ -175,7 +175,7 @@ static struct pbuf *create_interface_buffer(state_t *state, ethernet_buffer_t *b
 static inline ethernet_buffer_t *alloc_tx_buffer(size_t length)
 {
     if (BUF_SIZE < length) {
-        sel4cp_dbg_puts("Requested buffer size too large.");
+        microkit_dbg_puts("Requested buffer size too large.");
         return NULL;
     }
 
@@ -322,9 +322,9 @@ static void get_mac(void)
     state.mac[3] = 0;
     state.mac[4] = 0;
     state.mac[5] = 0;
-    /* sel4cp_ppcall(RX_CH, sel4cp_msginfo_new(0, 0));
-    uint32_t palr = sel4cp_mr_get(0);
-    uint32_t paur = sel4cp_mr_get(1);
+    /* microkit_ppcall(RX_CH, microkit_msginfo_new(0, 0));
+    uint32_t palr = microkit_mr_get(0);
+    uint32_t paur = microkit_mr_get(1);
     state.mac[0] = palr >> 24;
     state.mac[1] = palr >> 16 & 0xff;
     state.mac[2] = palr >> 8 & 0xff;
@@ -346,13 +346,13 @@ void init_post(void)
     setup_udp_socket();
     setup_utilization_socket();
 
-    print(sel4cp_name);
+    print(microkit_name);
     print(": init complete -- waiting for notification\n");
 }
 
 void init(void)
 {
-    print(sel4cp_name);
+    print(microkit_name);
     print(": elf PD init function running\n");
 
     /* Set up shared memory regions */
@@ -412,10 +412,10 @@ void init(void)
 
     netif_set_default(&(state.netif));
 
-    sel4cp_notify(RX_CH);
+    microkit_notify(RX_CH);
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     switch(ch) {
         case RX_CH:
@@ -427,7 +427,7 @@ void notified(sel4cp_channel ch)
         case IRQ:
             /* Timer */
             irq(ch);
-            sel4cp_irq_ack(ch);
+            microkit_irq_ack(ch);
             break;
         case TX_CH:
             /*
@@ -439,20 +439,20 @@ void notified(sel4cp_channel ch)
                 process_rx_queue();
             break;
         default:
-            sel4cp_dbg_puts("lwip: received notification on unexpected channel\n");
+            microkit_dbg_puts("lwip: received notification on unexpected channel\n");
             assert(0);
             break;
     }
     if (notify_rx) {
         notify_rx = false;
-        sel4cp_notify_delayed(RX_CH);
+        microkit_notify_delayed(RX_CH);
     }
     if (notify_tx) {
         notify_tx = false;
         if (!have_signal) {
-            sel4cp_notify_delayed(TX_CH);
-        } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH){
-            sel4cp_notify(TX_CH);
+            microkit_notify_delayed(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH){
+            microkit_notify(TX_CH);
         }
     }
 }

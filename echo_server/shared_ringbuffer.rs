@@ -8,7 +8,7 @@
 use core::assert;
 use core::intrinsics;
 use zerocopy::{AsBytes, FromBytes};
-use sel4cp::memory_region::{Shared};
+use sel4_externally_shared::{ExternallySharedRef};
 
 const RING_SIZE: u32 = 512;
 
@@ -39,25 +39,25 @@ type Notify = fn();
 /* A ring handle for enqueing/dequeuing into  */
 pub struct RingHandle<'a> {
     /// Free ring, contains buffers that are empty and available for use.
-    pub free: Shared<&'a mut RingBuffer>,
+    pub free: ExternallySharedRef<&'a mut RingBuffer>,
     /// Used ring, contains buffers that are ready for processing.
-    pub used: Shared<&'a mut RingBuffer>,
+    pub used: ExternallySharedRef<&'a mut RingBuffer>,
     /// Function to be used to signal that work is queued in the used ring
     notify: Notify,
 }
 
 /// Check if the ring buffer is empty
-pub fn ring_empty(ring: &Shared<&mut RingBuffer>) -> bool {
+pub fn ring_empty(ring: &ExternallySharedRef<&mut RingBuffer>) -> bool {
     return ring_size(ring) == 0;
 }
 
 /// Check if the ring buffer is full
-pub fn ring_full(ring: &Shared<&mut RingBuffer>) -> bool {
+pub fn ring_full(ring: &ExternallySharedRef<&mut RingBuffer>) -> bool {
     ring_size(ring) == RING_SIZE - 1
 }
 
 /// Get the number of buffers in the ring
-pub fn ring_size(ring: &Shared<&mut RingBuffer>) -> u32 {
+pub fn ring_size(ring: &ExternallySharedRef<&mut RingBuffer>) -> u32 {
     let read_idx = ring.map(|r| & r.read_idx).read();
     let write_idx = ring.map(|r| & r.write_idx).read();
     assert!(write_idx >= read_idx);
@@ -81,7 +81,7 @@ pub fn notify(ring: &RingHandle) {
 /// @param len length of data inside the buffer above.
 /// @param cookie optional pointer to data required on dequeueing.
 /// @return -1 when ring is empty, 0 on success.
-pub fn enqueue(ring: &mut Shared<&mut RingBuffer>, buffer_addr: usize, len: usize, cookie: usize) -> Result<(), &'static str>
+pub fn enqueue(ring: &mut ExternallySharedRef<&mut RingBuffer>, buffer_addr: usize, len: usize, cookie: usize) -> Result<(), &'static str>
 {
     assert!(buffer_addr != 0);
     if ring_full(ring) {
@@ -121,7 +121,7 @@ pub fn enqueue(ring: &mut Shared<&mut RingBuffer>, buffer_addr: usize, len: usiz
  *
  * @return -1 when ring is empty, 0 on success.
  */
-pub fn dequeue(ring: &mut Shared<&mut RingBuffer>) -> Result<BuffDesc, &'static str>
+pub fn dequeue(ring: &mut ExternallySharedRef<&mut RingBuffer>) -> Result<BuffDesc, &'static str>
 {
     if ring_empty(&ring) {
         return Err("Trying to dequeue from an empty ring");
@@ -223,7 +223,7 @@ pub fn dequeue_used(ring: &mut RingHandle) -> Result<BuffDesc, &'static str> {
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-pub fn ring_init<'a>(free: Shared<&'a mut RingBuffer>, used: Shared<&'a mut RingBuffer>, notify: Notify, buffer_init: bool) -> RingHandle<'a> {
+pub fn ring_init<'a>(free: ExternallySharedRef<&'a mut RingBuffer>, used: ExternallySharedRef<&'a mut RingBuffer>, notify: Notify, buffer_init: bool) -> RingHandle<'a> {
     let mut ring = RingHandle {
         free: free,
         used: used,
